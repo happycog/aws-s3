@@ -1,8 +1,8 @@
 <?php
 /**
- * @link https://craftcms.com/
+ * @link      https://craftcms.com/
  * @copyright Copyright (c) Pixel & Tonic, Inc.
- * @license MIT
+ * @license   MIT
  */
 
 namespace craft\awss3\migrations;
@@ -10,14 +10,14 @@ namespace craft\awss3\migrations;
 use Craft;
 use craft\awss3\Volume;
 use craft\db\Migration;
+use craft\db\Query;
 use craft\helpers\Json;
-use craft\services\Volumes;
 
 /**
  * Installation Migration
  *
  * @author Pixel & Tonic, Inc. <support@pixelandtonic.com>
- * @since 1.0
+ * @since  3.0
  */
 class Install extends Migration
 {
@@ -53,36 +53,39 @@ class Install extends Migration
      */
     private function _convertVolumes()
     {
-        $projectConfig = Craft::$app->getProjectConfig();
-        $projectConfig->muteEvents = true;
+        $volumes = (new Query())
+            ->select([
+                'id',
+                'fieldLayoutId',
+                'settings',
+            ])
+            ->where(['type' => 'craft\volumes\AwsS3'])
+            ->from(['{{%volumes}}'])
+            ->all();
 
-        $volumes = $projectConfig->get(Volumes::CONFIG_VOLUME_KEY) ?? [];
+        $dbConnection = Craft::$app->getDb();
 
-        foreach ($volumes as $uid => &$volume) {
-            if ($volume['type'] === Volume::class && isset($volume['settings']) && is_array($volume['settings'])) {
-                $settings = $volume['settings'];
+        foreach ($volumes as $volume) {
 
-                $hasUrls = !empty($volume['hasUrls']);
+            $settings = Json::decode($volume['settings']);
+
+            if ($settings !== null) {
+                $hasUrls = !empty($settings['publicURLs']);
                 $url = ($hasUrls && !empty($settings['urlPrefix'])) ? $settings['urlPrefix'] : null;
                 $settings['region'] = $settings['location'];
-                unset($settings['urlPrefix'], $settings['location'], $settings['storageClass']);
+                unset($settings['publicURLs'], $settings['urlPrefix'], $settings['location']);
 
-                if (preg_match('/^([\d]+)([a-z]+)$/', $settings['expires'], $matches)) {
-                    $settings['expires'] = $matches[1] . ' ' . $matches[2];
-                }
-
-                $volume['url'] = $url;
-                $volume['settings'] = $settings;
-
-                $this->update('{{%volumes}}', [
-                    'settings' => Json::encode($settings),
+                $values = [
+                    'type' => Volume::class,
+                    'hasUrls' => $hasUrls,
                     'url' => $url,
-                ], ['uid' => $uid]);
+                    'settings' => Json::encode($settings)
+                ];
 
-                $projectConfig->set(Volumes::CONFIG_VOLUME_KEY . '.' . $uid, $volume);
+                $dbConnection->createCommand()
+                    ->update('{{%volumes}}', $values, ['id' => $volume['id']])
+                    ->execute();
             }
         }
-
-        $projectConfig->muteEvents = false;
     }
 }

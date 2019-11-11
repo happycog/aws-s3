@@ -1,101 +1,67 @@
-<p align="center"><img src="./src/icon.svg" width="100" height="100" alt="Amazon S3 for Craft CMS icon"></p>
-
-<h1 align="center">Amazon S3 for Craft CMS</h1>
+Amazon S3 for Craft CMS
+=======================
 
 This plugin provides an [Amazon S3](https://aws.amazon.com/s3/) integration for [Craft CMS](https://craftcms.com/).
 
+
 ## Requirements
 
-This plugin requires Craft CMS 3.1.5 or later.
+This plugin requires Craft CMS 3.0.0-RC4 or later.
+
 
 ## Installation
 
-You can install this plugin from the Plugin Store or with Composer.
+To install the plugin, follow these instructions.
 
-#### From the Plugin Store
+1. Open your terminal and go to your Craft project:
 
-Go to the Plugin Store in your project’s Control Panel and search for “Amazon S3”. Then click on the “Install” button in its modal window.
+        cd /path/to/project
 
-#### With Composer
+2. Then tell Composer to load the plugin:
 
-Open your terminal and run the following commands:
+        composer require craftcms/aws-s3
 
-```bash
-# go to the project directory
-cd /path/to/my-project.test
-
-# tell Composer to load the plugin
-composer require craftcms/aws-s3
-
-# tell Craft to install the plugin
-./craft install/plugin aws-s3
-```
+3. In the Control Panel, go to Settings → Plugins and click the “Install” button for Amazon S3.
 
 ## Setup
 
 To create a new asset volume for your Amazon S3 bucket, go to Settings → Assets, create a new volume, and set the Volume Type setting to “Amazon S3”.
 
-> **Tip:** The Base URL, Access Key ID, Secret Access Key, Bucket, Region, Subfolder, CloudFront Distribution ID, and CloudFront Path Prefix settings can be set to environment variables. See [Environmental Configuration](https://docs.craftcms.com/v3/config/environments.html) in the Craft docs to learn more about that.
+### Per-Environment Configuration
 
-### AWS IAM Permissions
+Once you’ve created your S3 volume in the Control Panel, you can override its settings with different values for each environment.
 
-Setting up IAM permissions for use with this plugin differs from what options you want to be available.
+First, add the following environment variables to your `.env` and `.env.example` files:
 
-Generally, you'll want an IAM policy that grants the following actions on the [resource(s)](https://docs.aws.amazon.com/AmazonS3/latest/dev/s3-arn-format.html) that you'll use:
-* `s3:GetBucketLocation`
-* `s3:ListBucket`
-* `s3:PutObject`
-* `s3:GetObject`
-* `s3:DeleteObject`
-* `s3:GetObjectAcl`
-* `s3:PutObjectAcl`
-
-If you want to allow the site administrator to list and select the bucket to use, you'll also have to add the `s3:ListAllMyBuckets` permission to the `arn:aws:s3:::` resource and the `s3:GetBucketLocation` permission to the specific bucket resource. Please note, that if a bucket lacks the `s3:GetBucketLocation` permission, it will not appear in the bucket selection list.
-
-A typical IAM policy that grants the user to choose a bucket can look like this:
 ```
-{
-"Version": "2012-10-17",
-"Statement": [
-    {
-        "Effect": "Allow",
-        "Action": [
-            "s3:ListAllMyBuckets"
-        ],
-        "Resource": "*"
-    },
-    {
-        "Effect": "Allow",
-        "Action": [
-            "s3:GetBucketLocation",
-            "s3:ListBucket",
-            "s3:PutObject",
-            "s3:GetObject",
-            "s3:DeleteObject",
-            "s3:GetObjectAcl",
-            "s3:PutObjectAcl"
-        ],
-        "Resource": [
-            "arn:aws:s3:::bucketname/*"
-        ]
-    },
-    {
-        "Effect": "Allow",
-        "Action": [
-            "s3:GetBucketLocation",
-            "s3:ListBucket"
-        ],
-        "Resource": [
-            "arn:aws:s3:::bucketname"
-        ]
-    }
-]
-}
+# The AWS API key with read/write access to S3
+S3_API_KEY=""
+
+# The AWS API key secret
+S3_SECRET=""
+
+# The name of the S3 bucket
+S3_BUCKET=""
+
+# The region the S3 bucket is in
+S3_REGION=""
+``` 
+
+Then fill in the values in your `.env` file (leaving the values in `.env.example` blank).
+
+Finally, create a `config/volumes.php` file containing references to these variables:
+
+```php
+<?php
+
+return [
+    'myS3VolumeHandle' => [
+        'hasUrls' => true,
+        'url' => 'https://s3-eu-west-1.amazonaws.com/'.getenv('S3_BUCKET').'/',
+        'keyId' => getenv('S3_API_KEY'),
+        'secret' => getenv('S3_SECRET'),
+        'bucket' => getenv('S3_BUCKET'),
+        'region' => getenv('S3_REGION'),
+    ],
+];
 ```
-### Using the automatic focal point detection
-
-This plugin can use the AWS Rekognition service to detect faces in an image and automatically set the focal point accordingly. This requires the image to be either a jpg or a png file. To enable this feature, just turn it on the volume settings.
-
-:warning: ️Using this will incur extra cost for each upload
-
-:warning: ️Using this requires the <code>rekognition:DetectFaces</code> action to be allowed.
